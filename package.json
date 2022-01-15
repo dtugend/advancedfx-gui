@@ -1,22 +1,19 @@
 {
-  "name": "electron-quick-start",
+  "name": "advancedfx-gui",
   "version": "1.0.0",
-  "description": "A minimal Electron application",
+  "description": "advancefx GUI",
   "main": "main.js",
   "scripts": {
     "start": "electron ."
   },
-  "repository": "https://github.com/electron/electron-quick-start",
-  "keywords": [
-    "Electron",
-    "quick",
-    "start",
-    "tutorial",
-    "demo"
-  ],
-  "author": "GitHub",
-  "license": "CC0-1.0",
+  "repository": "https://github.com/advancedfx/advancedfx-gui",
+  "author": "advancedfx.org",
+  "license": "MIT",
   "devDependencies": {
-    "electron": "^16.0.5"
+    "bindings": "^1.5.0",
+    "electron": "^16.0.5",
+    "electron-rebuild": "^3.2.5",
+    "node-addon-api": "^4.2.0",
+    "node-gyp": "^8.4.1"
   }
 }

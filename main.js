@@ -1,6 +1,13 @@
 // Modules to control application life and create native browser window
-const {app, BrowserWindow} = require('electron')
+const {app, ipcMain, BrowserWindow} = require('electron');
+const { write } = require('fs');
 const path = require('path')
+const advancedfx_gui_native = require('bindings')('advancedfx_gui_native')
+const jsonrpc = require('./modules/jsonrpc.js');
+
+
+let writePipe
+let readPipe
 
 function createWindow () {
   // Create the browser window.
@@ -17,6 +24,63 @@ function createWindow () {
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools()
+
+  serverWritePipe = new advancedfx_gui_native.AnonymousPipe();
+  serverReadPipe = new advancedfx_gui_native.AnonymousPipe();
+  clientWritePipe = new advancedfx_gui_native.AnonymousPipe();
+  clientReadPipe = new advancedfx_gui_native.AnonymousPipe();
+
+  mainWindow.on('closed', function(){
+    
+  })
+
+  let serverWritePipeReadHandle = serverWritePipe.nativeReadHandleToLong();
+  let serverReadPipeWriteHandle = serverReadPipe.nativeWriteHandleToLong();
+
+  let jsonRpcServer = new jsonrpc.JsonRpc_2_0_Server(async () => { return await serverReadPipe.readString(); }, async(value) => { await serverWritePipe.writeString(value); });
+
+  jsonRpcServer.on('GetAfxHookSourceServerReadHandle', async () => {
+    return clientWritePipe.nativeReadHandle();
+  });
+  jsonRpcServer.on('GetAfxHookSourceServerWriteHandle', async () => {
+    return clientReadPipe.nativeWriteHandle();
+  });
+  jsonRpcServer.on('DrawingWindowCreated', async () => {});
+  jsonRpcServer.on('DrawingWindowDestroyed', async() =>{});
+  jsonRpcServer.on('SendMouseInputEvent', async(ev)=>{
+    return false;
+  });
+  jsonRpcServer.on('SendMouseWheelInputEvent', async(ev)=>{
+    return false;
+  });
+  jsonRpcServer.on('SendKeyboardInputEvent', async(ev)=>{
+    return false;
+  });
+
+  let pump = jsonRpcServer.pump();
+
+  const { execFile }= require('child_process');
+  execFile('C:\\source\\advancedfx-dtugend-v3-dev\\build\\Release\\bin\\hlae.exe', [
+    '-customLoader',
+    '-noGui',
+    '-autoStart',
+    '-addEnv', 'SteamPath=C:\\Program Files (x86)\\Steam',
+    '-addEnv', 'SteamClientLaunch=1',
+    '-addEnv', 'SteamGameId=730',
+    '-addEnv', 'SteamAppId=730',
+    '-addEnv', 'SteamOverlayGameId=730',
+    '-addEnv', 'USRLOCALCSGO=C:\\Users\\Dominik\\Desktop\\mmcfg',
+    '-addEnv', `AFXGUI_PIPE_READ=${serverWritePipeReadHandle}`,
+    '-addEnv', `AFXGUI_PIPE_WRITE=${serverReadPipeWriteHandle}`,
+    '-hookDllPath', 'C:\\source\\advancedfx-dtugend-v3-dev\\build\\Release\\bin\\AfxHookSource.dll',
+    '-programPath', 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\csgo.exe',
+    '-cmdLine', '-steam -insecure +sv_lan 1 -window -console -game csgo +echo "Hello World" -w 1280 -h 720'
+    ], (error, stdout, stderr) => {
+    if (error) {
+      throw error;
+    }
+    console.log(stdout);
+  });
 }
 
 // This method will be called when Electron has finished
@@ -36,8 +100,25 @@ app.whenReady().then(() => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') app.quit()
+  async function asyncWindowAllClosed(){
+    if(serverWritePipe) await serverWritePipe.close();
+    if(serverReadPipe) await serverReadPipe.close();  
+    if(clientWritePipe) await clientWritePipe.close();
+    if(clientReadPipe) await clientReadPipe.close();
+    await pump;
+    if (process.platform !== 'darwin') app.quit()
+  }
+  asyncWindowAllClosed();
+})
+
+app.on('will-quit', function() {
+
 })
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
+
+ipcMain.handle('jsonRequest', async (event,value) => {
+  //await writePipe.writeString(value);
+  //return await readPipe.readString();
+})

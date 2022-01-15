@@ -1,3 +1,12 @@
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('advancedfx', {
+  jsonRequest: (value) => {
+    return ipcRenderer.invoke('jsonRequest', value);
+  }
+})
+
+
 // All of the Node.js APIs are available in the preload process.
 // It has the same sandbox as a Chrome extension.
 window.addEventListener('DOMContentLoaded', () => {

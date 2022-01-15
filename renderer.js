@@ -1,6 +1,12 @@
-// This file is required by the index.html file and will
-// be executed in the renderer process for that window.
-// No Node.js APIs are available in this process because
-// `nodeIntegration` is turned off. Use `preload.js` to
-// selectively enable features needed in the rendering
-// process.
+{
+    const strIn = document.getElementById("strIn");
+    const strOut = document.getElementById("strOut");
+    const strSend = document.getElementById("strSend");
+
+    strSend.onclick = function(ev){
+        console.log(window.advancedfx);
+        window.advancedfx.jsonRequest(strIn.value).then((result)=>{
+            strOut.value = result;
+        });
+    }
+}
