@@ -507,10 +507,339 @@ bool AnonymousPipe::WriteBytes(const void * pData, DWORD bytesToWrite) {
   return true;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+#include <d3d11.h>
+
+class SharedTexture : public Napi::ObjectWrap<SharedTexture> {
+ public:
+  static Napi::Object Init(Napi::Env env, Napi::Object exports);  
+  SharedTexture(const Napi::CallbackInfo& info);
+  virtual void Finalize(Napi::Env env) override;  
+ private:
+  ID3D11Texture2D * m_StagingTexture = nullptr;
+  ID3D11Texture2D * m_SharedTexture = nullptr;
+  ID3D11DeviceContext* m_Ctx = nullptr;
+  HANDLE m_SharedHandle = INVALID_HANDLE_VALUE;
+  int m_Width = 0;
+  int m_Height = 0;
+
+  Napi::Value Delete(const Napi::CallbackInfo& info);
+  Napi::Value SharedTexture::GetSharedHandle(const Napi::CallbackInfo& info);
+  Napi::Value SharedTexture::Update(const Napi::CallbackInfo& info);
+
+  void DoClose();
+};
+
+Napi::Object SharedTexture::Init(Napi::Env env, Napi::Object exports) {
+  Napi::Function func =
+    DefineClass(env, "SharedTexture", {
+        InstanceMethod("delete", &SharedTexture::Delete),
+        InstanceMethod("getSharedHandle", &SharedTexture::GetSharedHandle),
+        InstanceMethod("update", &SharedTexture::Update),
+    });
+
+  Napi::FunctionReference* constructor = new Napi::FunctionReference();
+  *constructor = Napi::Persistent(func);
+  env.SetInstanceData(constructor);
+
+  exports.Set("SharedTexture", func);
+  return exports;
+}
+
+SharedTexture::SharedTexture(const Napi::CallbackInfo& info)
+: Napi::ObjectWrap<SharedTexture>(info) {
+
+  if (info.Length() != 3) {
+    Napi::Error::New(info.Env(), "Expected exactly 3 arguments")
+        .ThrowAsJavaScriptException();
+    return;
+  }
+
+  LUID targetLUID {};
+  bool bOkay = info[0].IsObject();
+  if(bOkay){
+    Napi::Object obj = info[0].As<Napi::Object>();
+    bOkay = obj.Has("lo") && obj.Has("hi");
+    if(bOkay) {
+      Napi::Value lo = obj.Get("lo");
+      Napi::Value hi = obj.Get("hi");
+      bOkay = lo.IsNumber() && hi.IsNumber();
+      if(bOkay) {
+        Napi::Number numLo = lo.As<Napi::Number>();
+        Napi::Number numHi = hi.As<Napi::Number>();
+        targetLUID.LowPart = (LONG)numLo.Int32Value();
+        targetLUID.HighPart = (LONG)numHi.Int32Value();
+      }
+    }
+  }
+
+  if(!bOkay) {
+    Napi::Error::New(info.Env(), "Expected adapter LUID Handle object as argument 0")
+      .ThrowAsJavaScriptException();
+    return;
+  }
+
+  if (!info[1].IsNumber() && info[2].IsNumber()) {
+    Napi::Error::New(info.Env(), "Expected width and height Number for arguments 1 and 2")
+        .ThrowAsJavaScriptException();
+    return;
+  }
+
+  int32_t width = info[1].As<Napi::Number>().Int32Value();
+  int32_t height = info[2].As<Napi::Number>().Int32Value();
+
+  if(width < 1 || height < 1) {
+    Napi::Error::New(info.Env(), "Arguments width and height must be at least 1")
+        .ThrowAsJavaScriptException();
+    return;
+  }
+
+  
+  IDXGIFactory * pFactory;
+  if(SUCCEEDED(CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&pFactory) ))) {
+
+    IDXGIAdapter * pActualAdapter = nullptr;
+    {
+      UINT i = 0; 
+      IDXGIAdapter * pAdapter;
+      while(pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND) 
+      { 
+        DXGI_ADAPTER_DESC desc;
+        if(SUCCEEDED(pAdapter->GetDesc(&desc))) {
+          if(desc.AdapterLuid.HighPart == targetLUID.HighPart && desc.AdapterLuid.LowPart == targetLUID.LowPart) {
+            pAdapter->AddRef();
+            pActualAdapter = pAdapter; 
+          }
+        }
+        pAdapter->Release();
+        ++i; 
+      } 
+    }
+
+    if(pActualAdapter) {
+      ID3D11Device * pDevice;
+      ID3D11DeviceContext * pCtx;
+      if(SUCCEEDED(D3D11CreateDevice(pActualAdapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, 0, NULL, 0, D3D11_SDK_VERSION, &pDevice, NULL, &pCtx))) {
+
+        D3D11_TEXTURE2D_DESC desc {
+          (UINT)width,
+          (UINT)height,
+          1,
+          1,
+          DXGI_FORMAT_B8G8R8A8_UNORM,
+          {1, 0},
+          D3D11_USAGE_DYNAMIC,
+          D3D11_BIND_SHADER_RESOURCE,
+          D3D11_CPU_ACCESS_WRITE,
+          0
+        };
+
+        if(SUCCEEDED(pDevice->CreateTexture2D(&desc,NULL,&m_StagingTexture))) {
+
+          desc.Usage = D3D11_USAGE_DEFAULT;
+          desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+          desc.CPUAccessFlags = 0;
+          desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+
+          if(SUCCEEDED(pDevice->CreateTexture2D(&desc,NULL,&m_SharedTexture))) {
+
+            m_SharedHandle = INVALID_HANDLE_VALUE;
+
+            IDXGIResource* dxgiResource;
+
+            if (SUCCEEDED(m_SharedTexture->QueryInterface(__uuidof(IDXGIResource),
+                                                  (void**)&dxgiResource))) {
+              if (FAILED(dxgiResource->GetSharedHandle(&m_SharedHandle))) {
+                m_SharedHandle = INVALID_HANDLE_VALUE;
+              }
+              dxgiResource->Release();
+            }
+
+            if(INVALID_HANDLE_VALUE == m_SharedHandle) {
+              Napi::Error::New(info.Env(), "Getting shared Handle failed")
+                .ThrowAsJavaScriptException();
+            }
+
+            if(m_SharedTexture && INVALID_HANDLE_VALUE != m_SharedHandle) {
+              pCtx->AddRef();
+              m_Ctx = pCtx;
+              m_Width = width;
+              m_Height = height;
+            } else {
+              if(m_SharedTexture) {
+                m_SharedTexture->Release();
+                m_SharedTexture = nullptr;
+              }
+              if(m_StagingTexture) {
+                m_StagingTexture->Release();
+                m_StagingTexture = nullptr;
+              }
+            }
+            
+          } else {
+            Napi::Error::New(info.Env(), "CreateTexture2D failed for shared texture")
+            .ThrowAsJavaScriptException();
+          }
+        } else {
+          Napi::Error::New(info.Env(), "CreateTexture2D failed for staging texture")
+          .ThrowAsJavaScriptException();
+        }
+
+        pDevice->Release();
+        pCtx->Release();
+      } else {
+        Napi::Error::New(info.Env(), "D3D11CreateDevice failed")
+        .ThrowAsJavaScriptException();
+      }
+
+      pActualAdapter->Release();
+    } else {
+      Napi::Error::New(info.Env(), "Could not find adapater for given LUID")
+        .ThrowAsJavaScriptException();
+    }
+
+    pFactory->Release();
+  } else {
+    Napi::Error::New(info.Env(), "Could not create IDXGIFactory")
+        .ThrowAsJavaScriptException();
+  }
+}
+
+void SharedTexture::Finalize(Napi::Env env) {
+  DoClose();
+}
+
+Napi::Value SharedTexture::Delete(const Napi::CallbackInfo& info) {
+  DoClose();
+   return info.Env().Undefined();
+}
+
+void SharedTexture::DoClose() {
+  if(m_StagingTexture) {
+    m_StagingTexture->Release();
+    m_StagingTexture = nullptr;
+  }
+  if(m_SharedTexture) {
+    m_SharedTexture->Release();
+    m_SharedTexture = nullptr;
+  }
+  if(m_Ctx) {
+    m_Ctx->Release();
+    m_Ctx = nullptr;
+  }
+  m_SharedHandle = INVALID_HANDLE_VALUE;
+}
+
+Napi::Value SharedTexture::GetSharedHandle(const Napi::CallbackInfo& info) {
+  void* __ptr64 ptr = HandleToHandle64(this->m_SharedHandle);
+  auto dict = Napi::Object::New(info.Env());
+  dict["lo"] = Napi::Number::New(info.Env(),(int)((unsigned __int64)ptr & 0xFFFFFFFF));
+  dict["hi"] = Napi::Number::New(info.Env(),(int)((unsigned __int64)ptr >> 32));
+  return dict;
+}
+
+Napi::Value SharedTexture::Update(const Napi::CallbackInfo& info) {
+  if(!(info.Length() == 2 && info[0].IsObject() && info[1].IsBuffer())) {
+    Napi::Error::New(info.Env(), "Expected exactly 2 parameters: dirty Rectangle, Buffer")
+        .ThrowAsJavaScriptException();
+    return info.Env().Undefined();    
+  }
+
+  Napi::Object obj = info[0].As<Napi::Object>();
+  if(!(obj.Has("x") && obj.Has("y") && obj.Has("width")&& obj.Has("height"))) {
+    Napi::Error::New(info.Env(), "Parameter 0 not a rectangle")
+        .ThrowAsJavaScriptException();
+    return info.Env().Undefined();    
+  }
+
+  Napi::Value valX = obj["x"];
+  Napi::Value valY = obj["y"];
+  Napi::Value valWidth = obj["width"];
+  Napi::Value valHeight = obj["height"];
+
+  if(!(valX.IsNumber() && valY.IsNumber() && valWidth.IsNumber() && valHeight.IsNumber())) {
+    Napi::Error::New(info.Env(), "Parameter 0 not a Rectangle")
+        .ThrowAsJavaScriptException();
+    return info.Env().Undefined();    
+  }
+
+  int x = valX.As<Napi::Number>().Int32Value();
+  int y = valY.As<Napi::Number>().Int32Value();
+  int width = valWidth.As<Napi::Number>().Int32Value();
+  int height = valHeight.As<Napi::Number>().Int32Value();
+
+  if(x < 0 || y < 0 || width > m_Width || height > m_Height || x + width > m_Width || y + height > m_Height) {
+    Napi::Error::New(info.Env(), "Parameter 0 Rectangle is out of allowed bounds")
+        .ThrowAsJavaScriptException();
+    return info.Env().Undefined();    
+  }
+
+  auto buf = info[1].As<Napi::Buffer<char*>>();
+
+  if(buf.ByteLength() != (size_t)4 * m_Width * m_Height) {
+    Napi::Error::New(info.Env(), "Image Buffer size unexpected: "+std::to_string(buf.ByteLength())+" != "+std::to_string((size_t)4 * m_Width * m_Height))
+        .ThrowAsJavaScriptException();
+    return info.Env().Undefined(); 
+  }
+/*
+  D3D11_BOX box = {
+    (size_t)x,(size_t)y,0,
+    (size_t)x+width,(size_t)y+width,0
+  };
+
+  m_Ctx->UpdateSubresource(m_SharedTexture, 0, &box, buf.Data(), width * 4 * sizeof(unsigned char), height * width * 4 * sizeof(unsigned char));*/
+
+  D3D11_MAPPED_SUBRESOURCE mapped;
+
+  if(SUCCEEDED(m_Ctx->Map(m_StagingTexture,0,D3D11_MAP_WRITE_DISCARD,0,&mapped))) {
+    unsigned char *pSrcData = reinterpret_cast<unsigned char *>(buf.Data());
+    size_t srcRowSize = sizeof(unsigned char) * 4 * m_Width;
+    if(mapped.pData != nullptr && pSrcData != nullptr) {
+      for(size_t i = 0; i < (size_t)height; i++) {
+        memcpy((unsigned char *)mapped.pData + ((size_t)y +i) * mapped.RowPitch  + (size_t)x * 4 * sizeof(unsigned char), pSrcData + ((size_t)y +i) * srcRowSize + (size_t)x * 4 * sizeof(unsigned char), sizeof(unsigned char) * 4 * width);
+      }
+    }
+
+    m_Ctx->Unmap(m_StagingTexture,0);
+
+    D3D11_BOX box = {
+      (size_t)x,(size_t)y,0,
+      (size_t)x+width,(size_t)y+height,1
+    };    
+
+    m_Ctx->CopySubresourceRegion(m_SharedTexture,0,x,y,0,m_StagingTexture,0,&box);
+  } else {
+    Napi::Error::New(info.Env(), "ID3D11DeviceContext::Map failed")
+        .ThrowAsJavaScriptException();
+    return info.Env().Undefined();    
+  }  
+
+  return info.Env().Undefined();
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+Napi::Value GetInvalidHandleValue(const Napi::CallbackInfo& info) {
+  void* __ptr64 ptr = HandleToHandle64(INVALID_HANDLE_VALUE);
+  auto dict = Napi::Object::New(info.Env());
+  dict["lo"] = Napi::Number::New(info.Env(),(int)((unsigned __int64)ptr & 0xFFFFFFFF));
+  dict["hi"] = Napi::Number::New(info.Env(),(int)((unsigned __int64)ptr >> 32));
+  return dict;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 using namespace Napi;
 
 Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
   AnonymousPipe::Init(env, exports);
+
+  SharedTexture::Init(env, exports);
+
+  exports.Set(Napi::String::New(env, "getInvalidHandleValue"),
+              Napi::Function::New(env, GetInvalidHandleValue));
 
   return exports;
 }

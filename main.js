@@ -1,10 +1,12 @@
 // Modules to control application life and create native browser window
 const {app, ipcMain, BrowserWindow} = require('electron');
 const { write } = require('fs');
+const { type } = require('os');
 const path = require('path')
 const advancedfx_gui_native = require('bindings')('advancedfx_gui_native')
 const jsonrpc = require('./modules/jsonrpc.js');
 
+app.disableHardwareAcceleration()
 
 let writePipe
 let readPipe
@@ -18,6 +20,9 @@ function createWindow () {
       preload: path.join(__dirname, 'preload.js')
     }
   })
+
+  let overlayWindow;
+  let overlayTexture;
 
   // and load the index.html of the app.
   mainWindow.loadFile('index.html')
@@ -45,8 +50,73 @@ function createWindow () {
   jsonRpcServer.on('GetAfxHookSourceServerWriteHandle', async () => {
     return clientReadPipe.nativeWriteHandle();
   });
-  jsonRpcServer.on('DrawingWindowCreated', async () => {});
-  jsonRpcServer.on('DrawingWindowDestroyed', async() =>{});
+  jsonRpcServer.on('DrawingWindowCreated', async (adapterLuid,width,height) => {
+    overlayTexture = new advancedfx_gui_native.SharedTexture(adapterLuid,width,height);
+    clientWritePipe.writeString(JSON.stringify({
+      "jsonrpc": "2.0",
+      "method": "SetSharedTextureHandle",
+      "params": [overlayTexture.getSharedHandle()]
+    }));
+    overlayWindow = new BrowserWindow({
+      show: false,
+      frame: false,
+     "width": width,
+     "height": height,
+      webPreferences: {
+        offscreen: true,
+        transparent: true
+      }
+    })
+    clientWritePipe.writeString(JSON.stringify({
+      "jsonrpc": "2.0",
+      "method": "SetMouseCursor",
+      "params": ["help"]
+    }));    
+    overlayWindow.webContents.on("paint", (event, dirty, image) => {
+      if(overlayTexture) {
+
+        /*clientWritePipe.writeString(JSON.stringify({
+          "jsonrpc": "2.0",
+          "method": "LockSharedTexture",
+          "params": []
+        }));*/
+
+        overlayTexture.update(dirty,image.getBitmap());
+
+        console.log(dirty);
+
+        /*clientWritePipe.writeString(JSON.stringify({
+          "jsonrpc": "2.0",
+          "method": "UnlockSharedTexture",
+          "params": []
+        }));*/
+      }
+    })
+    overlayWindow.on("cursor-changed", (event,type) => {
+      clientWritePipe.writeString(JSON.stringify({
+        "jsonrpc": "2.0",
+        "method": "SetMouseCursor",
+        "params": [type]
+      }));
+    })
+    overlayWindow.loadURL('https://github.com');
+    overlayWindow.webContents.setFrameRate(12);
+  });
+  jsonRpcServer.on('DrawingWindowDestroyed', async() =>{
+    clientWritePipe.writeString(JSON.stringify({
+      "jsonrpc": "2.0",
+      "method": "SetSharedTextureHandle",
+      "params": [advancedfx_gui_native.getInvalidHandleValue()]
+    }));
+    if(overlayWindow) {
+      overlayWindow.destroy();
+      overlayWindow = null;
+    }
+    if(overlayTexture) {
+      overlayTexture.delete();
+      overlayTexture = null;
+    }
+  });
   jsonRpcServer.on('SendMouseInputEvent', async(ev)=>{
     return false;
   });
