@@ -17,7 +17,7 @@
     "electron": "^16.0.5",
     "electron-builder": "^22.14.5",
     "electron-rebuild": "^3.2.5",
-    "node-addon-api": "^4.2.0",
+    "node-addon-api": "^4.3.0",
     "node-gyp": "^8.4.1"
   },
   "nodeGypRebuild": true
