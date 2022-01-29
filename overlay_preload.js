@@ -43,30 +43,44 @@ window.addEventListener('DOMContentLoaded', () => {
   captureEl.addEventListener("keypress", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;
+    event.stopImmediatePropagation();
+    event.preventDefault();  
   })
   captureEl.addEventListener("keydown", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;
+    event.stopImmediatePropagation();
+    event.preventDefault();  
   })
   captureEl.addEventListener("keyup", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;
+    event.stopImmediatePropagation();
+    event.preventDefault();  
   })
   captureEl.addEventListener("mousedown", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;
+    event.stopImmediatePropagation();
+    event.preventDefault();  
   })
   captureEl.addEventListener("mouseup", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;
+    event.stopImmediatePropagation();
+    event.preventDefault();  
   })
   captureEl.addEventListener("wheel", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;
+    event.stopImmediatePropagation();
+    event.preventDefault();  
   })
   captureEl.addEventListener("mousemove", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;
+    event.stopImmediatePropagation();
+    event.preventDefault();  
   })
 
   const replaceText = (selector, text) => {
