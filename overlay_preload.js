@@ -1,53 +1,72 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-let input_not_captured;
 let domContentLoaded = false;
+let input_captured = false;
+
+document.addEventListener("afxEndInput", (event)=>{
+  ipcRenderer.send("advancedfxAck-"+event.detail, input_captured)
+}, {bubble: true});
 
 
+ipcRenderer.on('afxEndInput', (event,id)=>{
+  document.dispatchEvent(new CustomEvent('afxEndInput', {detail: id}))
+})
+
+document.addEventListener("keypress", (event)=>{
+  input_captured = true;
+}, {capture: true})
+document.addEventListener("keydown", (event)=>{
+  input_captured = true;
+}, {capture: true})
+document.addEventListener("keyup", (event)=>{
+  input_captured = true;
+}, {capture: true})
+document.addEventListener("mousedown", (event)=>{
+  input_captured = true;
+})
+document.addEventListener("mouseup", (event)=>{
+  input_captured = true;
+}, {capture: true})
+document.addEventListener("wheel", (event)=>{
+  input_captured = true;
+}, {capture: true})
+document.addEventListener("mousemove", (event)=>{
+  input_captured = true;
+}, {capture: true})
 
 // All of the Node.js APIs are available in the preload process.
 // It has the same sandbox as a Chrome extension.
 window.addEventListener('DOMContentLoaded', () => {
 
-  const captureEl = document.getElementsByTagName('body')[0];
-
-  document.addEventListener('mousedown', (event)=>{  
-    if(event.x == -10000 && event.y == -10000) {
-      let result = input_not_captured;
-      input_not_captured = false;
-      event.stopImmediatePropagation();
-      event.preventDefault();      
-      ipcRenderer.send('overlayInputCapturedResult', result === undefined || !result);
-    }
-  }, {capture: true})
+  const captureEl = document.getElementById('capture');
 
   captureEl.addEventListener("keypress", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
-    input_not_captured = true;
+    input_captured = false;
   })
   captureEl.addEventListener("keydown", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
-    input_not_captured = true;
+    input_captured = false;
   })
   captureEl.addEventListener("keyup", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
-    input_not_captured = true;
+    input_captured = false;
   })
   captureEl.addEventListener("mousedown", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
-    input_not_captured = true;
+    input_captured = false;
   })
   captureEl.addEventListener("mouseup", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
-    input_not_captured = true;
+    input_captured = false;
   })
   captureEl.addEventListener("wheel", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
-    input_not_captured = true;
+    input_captured = false;
   })
   captureEl.addEventListener("mousemove", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
-    input_not_captured = true;
+    input_captured = false;
   })
 
   const replaceText = (selector, text) => {

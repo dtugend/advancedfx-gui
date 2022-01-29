@@ -782,13 +782,6 @@ Napi::Value SharedTexture::Update(const Napi::CallbackInfo& info) {
         .ThrowAsJavaScriptException();
     return info.Env().Undefined(); 
   }
-/*
-  D3D11_BOX box = {
-    (size_t)x,(size_t)y,0,
-    (size_t)x+width,(size_t)y+width,0
-  };
-
-  m_Ctx->UpdateSubresource(m_SharedTexture, 0, &box, buf.Data(), width * 4 * sizeof(unsigned char), height * width * 4 * sizeof(unsigned char));*/
 
   D3D11_MAPPED_SUBRESOURCE mapped;
 
@@ -809,6 +802,7 @@ Napi::Value SharedTexture::Update(const Napi::CallbackInfo& info) {
     };    
 
     m_Ctx->CopySubresourceRegion(m_SharedTexture,0,x,y,0,m_StagingTexture,0,&box);
+    m_Ctx->Flush();
   } else {
     Napi::Error::New(info.Env(), "ID3D11DeviceContext::Map failed")
         .ThrowAsJavaScriptException();

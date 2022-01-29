@@ -11,8 +11,6 @@ app.disableHardwareAcceleration()
 let writePipe
 let readPipe
 
-let onInputCapturedPromise;
-
 function createWindow () {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -64,9 +62,11 @@ function createWindow () {
     overlayWindow = new BrowserWindow({
       show: false,
       frame: false,
+      paintWhenInitiallyHidden: false,
      "width": width,
      "height": height,
       webPreferences: {
+        backgroundThrottling: false,
         offscreen: true,
         transparent: true,
         preload: path.join(__dirname, 'overlay_preload.js')
@@ -93,6 +93,8 @@ function createWindow () {
           "params": []
         }));*/
 
+        console.log(dirty);
+
         overlayTexture.update(dirty,image.getBitmap());
 
         /*clientWritePipe.writeString(JSON.stringify({
@@ -113,7 +115,7 @@ function createWindow () {
       
     })
     overlayWindow.loadFile("overlay_index.html");
-    overlayWindow.webContents.setFrameRate(12);
+    //overlayWindow.webContents.setFrameRate(12);
   });
   jsonRpcServer.on('DrawingWindowDestroyed', async() =>{
     clientWritePipe.writeString(JSON.stringify({
@@ -132,42 +134,46 @@ function createWindow () {
       overlayTexture = null;
     }
   });
+
+  async function overlayRendererInvoke(overlayWindow,channel,...args) {    
+    return await new Promise((resolve,reject)=>{
+      ipcMain.once("advancedfxAck-"+overlayWindow.id, (event,...args)=>{
+        resolve(args);
+      });
+      overlayWindow.webContents.send(channel, overlayWindow.id, ...args);
+    })
+  }
+
   jsonRpcServer.on('SendMouseInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      let promise = new Promise((resolve,reject)=>{
-        console.log("hi");
-        onInputCapturedPromise = resolve;
-      });
+      if(!overlayWindow.isFocused()) overlayWindow.focus();
       console.log("waiting: "+ev.type);
       overlayWindow.webContents.sendInputEvent(ev);
-      overlayWindow.webContents.sendInputEvent({type:"mousedown",x: -10000, y: -10000});
-      let result = await promise;
-      console.log("hi2");
-      return result;
+      result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
+      console.log(result);
+      return result[0];
     }
     return false;
   });
   jsonRpcServer.on('SendMouseWheelInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      let promise = new Promise((resolve,reject)=>{
-        onInputCapturedPromise = resolve;
-      });
+      if(!overlayWindow.isFocused()) overlayWindow.focus();
       console.log("waiting: "+ev.type);
       overlayWindow.webContents.sendInputEvent(ev);
-      overlayWindow.webContents.sendInputEvent({type:"mousedown",x: -10000, y: -10000});
-      return await promise;
+      result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
+      console.log(result);
+      return result[0];
     }
     return false;
   });
   jsonRpcServer.on('SendKeyboardInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      let promise = new Promise((resolve,reject)=>{
-        onInputCapturedPromise = resolve;
-      });
+      if(!overlayWindow.isFocused()) overlayWindow.focus();
       console.log("waiting: "+ev.type);
       overlayWindow.webContents.sendInputEvent(ev);
-      overlayWindow.webContents.sendInputEvent({type:"mousedown",x: -10000, y: -10000});
-      return await promise;
+      result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
+      console.log(result);
+      return result[0];
     }
     return false;
   });
@@ -236,11 +242,4 @@ app.on('will-quit', function() {
 ipcMain.handle('jsonRequest', async (event,value) => {
   //await writePipe.writeString(value);
   //return await readPipe.readString();
-})
-ipcMain.on('overlayInputCapturedResult', (event,captured)=>{
-  console.log("overlayInputCapturedResult("+captured+")");
-  let resolve = onInputCapturedPromise;
-  onInputCapturedPromise = null;
-  if(resolve) resolve(captured);
-  else console.log("not resolvable");
 })
