@@ -11,6 +11,8 @@ app.disableHardwareAcceleration()
 let writePipe
 let readPipe
 
+let onInputCapturedPromise;
+
 function createWindow () {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -22,6 +24,7 @@ function createWindow () {
   })
 
   let overlayWindow;
+  let overlayWindowDidFinishLoad = false;
   let overlayTexture;
 
   // and load the index.html of the app.
@@ -57,6 +60,7 @@ function createWindow () {
       "method": "SetSharedTextureHandle",
       "params": [overlayTexture.getSharedHandle()]
     }));
+    clientReadPipe.readString();
     overlayWindow = new BrowserWindow({
       show: false,
       frame: false,
@@ -64,14 +68,22 @@ function createWindow () {
      "height": height,
       webPreferences: {
         offscreen: true,
-        transparent: true
+        transparent: true,
+        preload: path.join(__dirname, 'overlay_preload.js')
       }
     })
+
+      overlayWindow.webContents.on('did-finish-load', ()=>{
+        overlayWindowDidFinishLoad = true;
+        overlayWindow.webContents.send('checkInputCaptured','dummy');
+      });
+
     clientWritePipe.writeString(JSON.stringify({
       "jsonrpc": "2.0",
       "method": "SetMouseCursor",
       "params": ["help"]
-    }));    
+    }));
+    clientReadPipe.readString();
     overlayWindow.webContents.on("paint", (event, dirty, image) => {
       if(overlayTexture) {
 
@@ -83,8 +95,6 @@ function createWindow () {
 
         overlayTexture.update(dirty,image.getBitmap());
 
-        console.log(dirty);
-
         /*clientWritePipe.writeString(JSON.stringify({
           "jsonrpc": "2.0",
           "method": "UnlockSharedTexture",
@@ -92,14 +102,17 @@ function createWindow () {
         }));*/
       }
     })
-    overlayWindow.on("cursor-changed", (event,type) => {
+    overlayWindow.webContents.on("cursor-changed", (event,type) => {
       clientWritePipe.writeString(JSON.stringify({
         "jsonrpc": "2.0",
         "method": "SetMouseCursor",
         "params": [type]
       }));
+      clientReadPipe.readString().then((result)=>{
+      })
+      
     })
-    overlayWindow.loadURL('https://github.com');
+    overlayWindow.loadFile("overlay_index.html");
     overlayWindow.webContents.setFrameRate(12);
   });
   jsonRpcServer.on('DrawingWindowDestroyed', async() =>{
@@ -108,7 +121,9 @@ function createWindow () {
       "method": "SetSharedTextureHandle",
       "params": [advancedfx_gui_native.getInvalidHandleValue()]
     }));
+    clientReadPipe.readString();
     if(overlayWindow) {
+      overlayWindowDidFinishLoad = false;
       overlayWindow.destroy();
       overlayWindow = null;
     }
@@ -118,12 +133,42 @@ function createWindow () {
     }
   });
   jsonRpcServer.on('SendMouseInputEvent', async(ev)=>{
+    if(overlayWindowDidFinishLoad) {
+      let promise = new Promise((resolve,reject)=>{
+        console.log("hi");
+        onInputCapturedPromise = resolve;
+      });
+      console.log("waiting: "+ev.type);
+      overlayWindow.webContents.sendInputEvent(ev);
+      overlayWindow.webContents.sendInputEvent({type:"mousedown",x: -10000, y: -10000});
+      let result = await promise;
+      console.log("hi2");
+      return result;
+    }
     return false;
   });
   jsonRpcServer.on('SendMouseWheelInputEvent', async(ev)=>{
+    if(overlayWindowDidFinishLoad) {
+      let promise = new Promise((resolve,reject)=>{
+        onInputCapturedPromise = resolve;
+      });
+      console.log("waiting: "+ev.type);
+      overlayWindow.webContents.sendInputEvent(ev);
+      overlayWindow.webContents.sendInputEvent({type:"mousedown",x: -10000, y: -10000});
+      return await promise;
+    }
     return false;
   });
   jsonRpcServer.on('SendKeyboardInputEvent', async(ev)=>{
+    if(overlayWindowDidFinishLoad) {
+      let promise = new Promise((resolve,reject)=>{
+        onInputCapturedPromise = resolve;
+      });
+      console.log("waiting: "+ev.type);
+      overlayWindow.webContents.sendInputEvent(ev);
+      overlayWindow.webContents.sendInputEvent({type:"mousedown",x: -10000, y: -10000});
+      return await promise;
+    }
     return false;
   });
 
@@ -191,4 +236,11 @@ app.on('will-quit', function() {
 ipcMain.handle('jsonRequest', async (event,value) => {
   //await writePipe.writeString(value);
   //return await readPipe.readString();
+})
+ipcMain.on('overlayInputCapturedResult', (event,captured)=>{
+  console.log("overlayInputCapturedResult("+captured+")");
+  let resolve = onInputCapturedPromise;
+  onInputCapturedPromise = null;
+  if(resolve) resolve(captured);
+  else console.log("not resolvable");
 })
