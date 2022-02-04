@@ -15,7 +15,6 @@ class JsonRpc_2_0_Server {
         let self = this;
 
         async function handleRequest(request) {
-            console.log(request);
             if(request["jsonrpc"] !== "2.0") throw "Not a JSON-RPC 2.0 request";
             let result = await self.fns[request["method"]].apply(null, request["params"]);
             if(result !== undefined) return {
@@ -39,7 +38,9 @@ class JsonRpc_2_0_Server {
         }
 
         while(this.active) {
-            let request = JSON.parse(await this.fnRead());
+            let strRequest = await this.fnRead();
+            console.log(strRequest);
+            let request = JSON.parse(strRequest);
 
             let result = Array.isArray(request) ? await handleRequests(request) : await handleRequest(request);
 

@@ -27,9 +27,9 @@ document.addEventListener("mousedown", (event)=>{
 document.addEventListener("mouseup", (event)=>{
   input_captured = true;
 }, {capture: true})
-document.addEventListener("wheel", (event)=>{
+document.addEventListener("mousewheel", (event)=>{
   input_captured = true;
-}, {capture: true})
+}, {capture: true,passive: false})
 document.addEventListener("mousemove", (event)=>{
   input_captured = true;
 }, {capture: true})
@@ -70,12 +70,12 @@ window.addEventListener('DOMContentLoaded', () => {
     event.stopImmediatePropagation();
     event.preventDefault();  
   })
-  captureEl.addEventListener("wheel", (event)=>{
+  captureEl.addEventListener("mousewheel", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;
     event.stopImmediatePropagation();
     event.preventDefault();  
-  })
+  }, {passive: false})
   captureEl.addEventListener("mousemove", (event)=>{
     if(event.eventPhase != Event.AT_TARGET) return;
     input_captured = false;

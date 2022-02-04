@@ -78,12 +78,6 @@ function createWindow () {
         overlayWindow.webContents.send('checkInputCaptured','dummy');
       });
 
-    clientWritePipe.writeString(JSON.stringify({
-      "jsonrpc": "2.0",
-      "method": "SetMouseCursor",
-      "params": ["help"]
-    }));
-    clientReadPipe.readString();
     overlayWindow.webContents.on("paint", (event, dirty, image) => {
       if(overlayTexture) {
 
@@ -147,6 +141,7 @@ function createWindow () {
   jsonRpcServer.on('SendMouseInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
       if(!overlayWindow.isFocused()) overlayWindow.focus();
+
       console.log("waiting: "+ev.type);
       overlayWindow.webContents.sendInputEvent(ev);
       result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
@@ -158,6 +153,14 @@ function createWindow () {
   jsonRpcServer.on('SendMouseWheelInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
       if(!overlayWindow.isFocused()) overlayWindow.focus();
+
+      /*// work around electron bug:
+      if(ev.globalX !== undefined && ev.globalY !== undefined) {
+        let bounds = overlayWindow.getContentBounds();
+        ev.x -= bounds.x - ev.globalX + ev.x;
+        ev.y -= bounds.y - ev.globalY + ev.y;
+      }*/
+
       console.log("waiting: "+ev.type);
       overlayWindow.webContents.sendInputEvent(ev);
       result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
