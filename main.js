@@ -142,8 +142,9 @@ function createWindow () {
 
   jsonRpcServer.on('SendMouseInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      console.log("waiting: "+ev.type);
+      if(overlayWindow.isFocusable() && !overlayWindow.isFocused()) overlayWindow.focus();
       overlayWindow.webContents.sendInputEvent(ev);
+      console.log("waiting: "+ev.type);
       result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
       console.log(result);
       return result[0];
@@ -152,13 +153,14 @@ function createWindow () {
   });
   jsonRpcServer.on('SendMouseWheelInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      console.log("waiting: "+ev.type);
+      if(overlayWindow.isFocusable() && !overlayWindow.isFocused()) overlayWindow.focus();
       if(ev.globalX !== undefined && ev.globalY !== undefined) {
         // work around electron bug:
         ev.x -= ev.globalX - ev.x;
         ev.y -= ev.globalY - ev.y;
       }
       overlayWindow.webContents.sendInputEvent(ev);
+      console.log("waiting: "+ev.type);
       result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
       console.log(result);
       return result[0];
@@ -167,8 +169,9 @@ function createWindow () {
   });
   jsonRpcServer.on('SendKeyboardInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      console.log("waiting: "+ev.type);
+      if(overlayWindow.isFocusable() && !overlayWindow.isFocused()) overlayWindow.focus();
       overlayWindow.webContents.sendInputEvent(ev);
+      console.log("waiting: "+ev.type);
       result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
       console.log(result);
       return result[0];
