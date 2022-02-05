@@ -38,49 +38,34 @@ document.addEventListener("mousemove", (event)=>{
 // It has the same sandbox as a Chrome extension.
 window.addEventListener('DOMContentLoaded', () => {
 
-  const captureEl = document.getElementById('capture');
 
-  captureEl.addEventListener("keypress", (event)=>{
-    if(event.eventPhase != Event.AT_TARGET) return;
+  document.addEventListener("keydown", (event)=>{
+    if(!(event.target && (event.target.id=="capture" || event.target.tagName == "BODY" || event.target.tagName=="HTML"))) return;
     input_captured = false;
-    event.stopImmediatePropagation();
-    event.preventDefault();  
   })
-  captureEl.addEventListener("keydown", (event)=>{
-    if(event.eventPhase != Event.AT_TARGET) return;
+  document.addEventListener("keypress", (event)=>{
+    if(!(event.target && (event.target.id=="capture" || event.target.tagName == "BODY" || event.target.tagName=="HTML"))) return;
     input_captured = false;
-    event.stopImmediatePropagation();
-    event.preventDefault();  
+  })  
+  document.addEventListener("keyup", (event)=>{
+    if(!(event.target && (event.target.id=="capture" || event.target.tagName == "BODY" || event.target.tagName=="HTML"))) return;
+    input_captured = false;
   })
-  captureEl.addEventListener("keyup", (event)=>{
-    if(event.eventPhase != Event.AT_TARGET) return;
+  document.addEventListener("mousedown", (event)=>{
+    if(!(event.target && (event.target.id=="capture" || event.target.tagName == "BODY" || event.target.tagName=="HTML"))) return;
     input_captured = false;
-    event.stopImmediatePropagation();
-    event.preventDefault();  
   })
-  captureEl.addEventListener("mousedown", (event)=>{
-    if(event.eventPhase != Event.AT_TARGET) return;
+  document.addEventListener("mouseup", (event)=>{
+    if(!(event.target && (event.target.id=="capture" || event.target.tagName == "BODY" || event.target.tagName=="HTML"))) return;
     input_captured = false;
-    event.stopImmediatePropagation();
-    event.preventDefault();  
   })
-  captureEl.addEventListener("mouseup", (event)=>{
-    if(event.eventPhase != Event.AT_TARGET) return;
+  document.addEventListener("mousewheel", (event)=>{
+    if(!(event.target && (event.target.id=="capture" || event.target.tagName == "BODY" || event.target.tagName=="HTML"))) return;
     input_captured = false;
-    event.stopImmediatePropagation();
-    event.preventDefault();  
-  })
-  captureEl.addEventListener("mousewheel", (event)=>{
-    if(event.eventPhase != Event.AT_TARGET) return;
-    input_captured = false;
-    event.stopImmediatePropagation();
-    event.preventDefault();  
   }, {passive: false})
-  captureEl.addEventListener("mousemove", (event)=>{
-    if(event.eventPhase != Event.AT_TARGET) return;
+  document.addEventListener("mousemove", (event)=>{
+    if(!(event.target && (event.target.id=="capture" || event.target.tagName == "BODY" || event.target.tagName=="HTML"))) return;
     input_captured = false;
-    event.stopImmediatePropagation();
-    event.preventDefault();  
   })
 
   const replaceText = (selector, text) => {
