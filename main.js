@@ -1,5 +1,5 @@
 // Modules to control application life and create native browser window
-const {app, ipcMain, BrowserWindow} = require('electron');
+const {app, ipcMain, BrowserWindow, BrowserView} = require('electron');
 const { write } = require('fs');
 const { type } = require('os');
 const path = require('path')
@@ -60,11 +60,13 @@ function createWindow () {
     }));
     clientReadPipe.readString();
     overlayWindow = new BrowserWindow({
+      "x": 0,
+      "y": 0,
+      "width": width,
+      "height": height,
       show: false,
       frame: false,
       paintWhenInitiallyHidden: false,
-     "width": width,
-     "height": height,
       webPreferences: {
         backgroundThrottling: false,
         offscreen: true,
@@ -73,12 +75,13 @@ function createWindow () {
       }
     })
 
-      overlayWindow.webContents.on('did-finish-load', ()=>{
-        overlayWindowDidFinishLoad = true;
-        overlayWindow.webContents.send('checkInputCaptured','dummy');
-      });
+    overlayWindow.webContents.on('did-finish-load', ()=>{
+      overlayWindowDidFinishLoad = true;
+      overlayWindow.webContents.send('checkInputCaptured','dummy');
+    });
 
     overlayWindow.webContents.on("paint", (event, dirty, image) => {
+      console.log("paint");
       if(overlayTexture) {
 
         /*clientWritePipe.writeString(JSON.stringify({
@@ -108,8 +111,7 @@ function createWindow () {
       })
       
     })
-    overlayWindow.loadFile("overlay_index.html");
-    //overlayWindow.webContents.setFrameRate(12);
+    overlayWindow.webContents.loadFile("overlay_index.html")
   });
   jsonRpcServer.on('DrawingWindowDestroyed', async() =>{
     clientWritePipe.writeString(JSON.stringify({
@@ -131,17 +133,15 @@ function createWindow () {
 
   async function overlayRendererInvoke(overlayWindow,channel,...args) {    
     return await new Promise((resolve,reject)=>{
-      ipcMain.once("advancedfxAck-"+overlayWindow.id, (event,...args)=>{
+      ipcMain.once("advancedfxAck-"+overlayWindow.webContents.id, (event,...args)=>{
         resolve(args);
       });
-      overlayWindow.webContents.send(channel, overlayWindow.id, ...args);
+      overlayWindow.webContents.send(channel, overlayWindow.webContents.id, ...args);
     })
   }
 
   jsonRpcServer.on('SendMouseInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      if(!overlayWindow.isFocused()) overlayWindow.focus();
-
       console.log("waiting: "+ev.type);
       overlayWindow.webContents.sendInputEvent(ev);
       result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
@@ -152,16 +152,12 @@ function createWindow () {
   });
   jsonRpcServer.on('SendMouseWheelInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      if(!overlayWindow.isFocused()) overlayWindow.focus();
-
-      /*// work around electron bug:
-      if(ev.globalX !== undefined && ev.globalY !== undefined) {
-        let bounds = overlayWindow.getContentBounds();
-        ev.x -= bounds.x - ev.globalX + ev.x;
-        ev.y -= bounds.y - ev.globalY + ev.y;
-      }*/
-
       console.log("waiting: "+ev.type);
+      if(ev.globalX !== undefined && ev.globalY !== undefined) {
+        // work around electron bug:
+        ev.x -= ev.globalX - ev.x;
+        ev.y -= ev.globalY - ev.y;
+      }
       overlayWindow.webContents.sendInputEvent(ev);
       result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
       console.log(result);
@@ -171,7 +167,6 @@ function createWindow () {
   });
   jsonRpcServer.on('SendKeyboardInputEvent', async(ev)=>{
     if(overlayWindowDidFinishLoad) {
-      if(!overlayWindow.isFocused()) overlayWindow.focus();
       console.log("waiting: "+ev.type);
       overlayWindow.webContents.sendInputEvent(ev);
       result = await overlayRendererInvoke(overlayWindow,"afxEndInput");
