@@ -745,9 +745,9 @@ electron-publish@22.14.5:
     mime "^2.5.2"
 
 electron@17:
-  version "17.0.0"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-17.0.0.tgz#60f00f3e3c657020e807a519700213943468b4d1"
-  integrity sha512-3UXcBQMwbMWdPvGHaSdPMluHrd+/bc+K143MyvE5zVZ+S1XCHt4sau7dj6svJHns5llN0YG/c6h/vRfadIp8Zg==
+  version "17.1.1"
+  resolved "https://registry.yarnpkg.com/electron/-/electron-17.1.1.tgz#a936907faf68a0a4ae24e8f79c8b22995661c54b"
+  integrity sha512-S+PIsCOfxB+9DkPsbnWpbLQx6+3P5FGedCeVQ/vhZEX8zD4Wj2F118HGFX6ShEfsaTYE623ESK/f+b2ueHpEpQ==
   dependencies:
     "@electron/get" "^1.13.0"
     "@types/node" "^14.6.2"
