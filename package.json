@@ -16,7 +16,7 @@
     "bindings": "1",
     "electron": "17",
     "electron-builder": "22",
-    "node-addon-api": "4"
+    "node-addon-api": "5"
   },
   "nodeGypRebuild": true
 }
