@@ -14,8 +14,8 @@
   "license": "MIT",
   "devDependencies": {
     "bindings": "1",
-    "electron": "17",
-    "electron-builder": "22",
+    "electron": "21",
+    "electron-builder": "23",
     "node-addon-api": "4"
   },
   "nodeGypRebuild": true

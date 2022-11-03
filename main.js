@@ -66,11 +66,11 @@ function createWindow () {
       "height": height,
       show: false,
       frame: false,
+      transparent: true,
       paintWhenInitiallyHidden: false,
       webPreferences: {
         backgroundThrottling: false,
         offscreen: true,
-        transparent: true,
         preload: path.join(__dirname, 'overlay_preload.js')
       }
     })
@@ -182,7 +182,7 @@ function createWindow () {
   let pump = jsonRpcServer.pump();
 
   const { execFile }= require('child_process');
-  execFile('C:\\source\\advancedfx-dtugend-v3-dev\\build\\Release\\bin\\hlae.exe', [
+  execFile('C:\\source\\advancedfx-v3\\build\\Release\\bin\\hlae.exe', [
     '-customLoader',
     '-noGui',
     '-autoStart',
@@ -194,7 +194,7 @@ function createWindow () {
     '-addEnv', 'USRLOCALCSGO=C:\\Users\\Dominik\\Desktop\\mmcfg',
     '-addEnv', `AFXGUI_PIPE_READ=${serverWritePipeReadHandle}`,
     '-addEnv', `AFXGUI_PIPE_WRITE=${serverReadPipeWriteHandle}`,
-    '-hookDllPath', 'C:\\source\\advancedfx-dtugend-v3-dev\\build\\Release\\bin\\AfxHookSource.dll',
+    '-hookDllPath', 'C:\\source\\advancedfx-v3\\build\\Release\\bin\\AfxHookSource.dll',
     '-programPath', 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\csgo.exe',
     '-cmdLine', '-steam -insecure +sv_lan 1 -window -console -game csgo +echo "Hello World" -w 1280 -h 720'
     ], (error, stdout, stderr) => {
