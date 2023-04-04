@@ -14,7 +14,7 @@
   "license": "MIT",
   "devDependencies": {
     "bindings": "1",
-    "electron": "21",
+    "electron": "24",
     "electron-builder": "23",
     "node-addon-api": "4"
   },
